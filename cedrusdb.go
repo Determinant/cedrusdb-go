@@ -74,6 +74,8 @@ func NewCedrus(dbPath string, config *C.CedrusConfig, truncate bool, autoFree bo
 	return
 }
 
+//// end Cedrus def
+
 func DefaultConfig() CedrusConfig {
 	return C.cedrus_config_default()
 }
@@ -81,5 +83,3 @@ func DefaultConfig() CedrusConfig {
 func (c Cedrus) Put(key []byte, val []byte) (res int) {
 	return int(C.cedrus_put(c.inner, (*C.uint8_t)(&key[0]), (C.size_t)(len(key)), (*C.uint8_t)(&val[0]), (C.size_t)(len(val))))
 }
-
-//// end Cedrus def

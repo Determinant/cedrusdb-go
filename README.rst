@@ -2,12 +2,13 @@ Install
 =======
 
 - Download the package: ``go get -d github.com/Determinant/cedrusdb-go``.
-- Know your go path: ``$(go env GOPATH)/src/github.com/Determinant/cedrusdb-go/scripts/build.sh``.
+- Set go path: ``export GOPATH=$(go env GOPATH)``.
+- Fetch the binaries: ``$GOPATH/src/github.com/Determinant/cedrusdb-go/scripts/build.sh``.
 
 How to Build Your Applicaiton
 =============================
 
-- Use ``source $(go env GOPATH)/src/github.com/Determinant/cedrusdb-go/scripts/env.sh && go build -o`` in place of ``go build -o``.
+- Use ``source $GOPATH/src/github.com/Determinant/cedrusdb-go/scripts/env.sh && go build -o`` in place of ``go build -o``.
 
 How to Build the Example Program
 ================================
