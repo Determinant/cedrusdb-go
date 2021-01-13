@@ -5,14 +5,13 @@ SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
 source "${SRC_DIR}/env.sh"
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
-    SRC_DIR="$(realpath $SRC_DIR/../)"
     ARCH="$(uname -m)"
     if [[ "$ARCH" != "x86_64" ]]; then
         echo "Architecture not supported yet."
         exit 1
     fi
-    if [[ "$SRC_DIR" != "$CEDRUSDB_GO_PATH" ]]; then
-        echo "The script can only be run from the go path ($SRC_DIR != $CEDRUSDB_GO_PATH)"
+    if [[ ! "$SRC_DIR/../" -ef "$CEDRUSDB_GO_PATH" ]]; then
+        echo "The script is not in the go path repo ($SRC_DIR != $CEDRUSDB_GO_PATH)"
         exit 1
     fi
     mkdir -p "$CEDRUSDB_PATH"

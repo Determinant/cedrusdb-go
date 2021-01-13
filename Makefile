@@ -10,7 +10,7 @@ build/libcedrusdb.a:
 	scripts/build.sh
 
 build/example: build/libcedrusdb.a example/main.go
-	bash -c 'source scripts/env.sh && go build -o $@ github.com/Determinant/cedrusdb-go/example'
+	bash -c 'source $$(go env GOPATH)/src/github.com/Determinant/cedrusdb-go/scripts/env.sh && go build -o $@ github.com/Determinant/cedrusdb-go/example'
 
 clean:
 	rm -rf build/
