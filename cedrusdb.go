@@ -22,24 +22,23 @@ func doubleFreeWarn(freed *bool) (res bool) {
 
 //// begin Cedrus def
 
-// CCedrus is the C pointer type for a Cedrus object.
-type CCedrus = *C.Cedrus
+type cCedrus = *C.Cedrus
 
 // CedrusObj is the wrapped Cedrus pointer.
 type CedrusObj struct {
-	inner CCedrus
+	inner cCedrus
 	freed bool
 }
 
 // Cedrus is the CedrusDB handle.
 type Cedrus = *CedrusObj
 
-// CedrusFromC converts an existing C pointer into a go object. Notice that
-// when the go object does *not* own the resource of the C pointer, so it is
-// only valid to the extent in which the given C pointer is valid. The C memory
-// will not be deallocated when the go object is finalized by GC. This applies
-// to all other "FromC" functions.
-func CedrusFromC(ptr CCedrus) Cedrus {
+// cedrusFromC converts an existing C pointer into a go object. Notice that the
+// go object does *not* own the resource of the C pointer, so it is only valid
+// to the extent in which the given C pointer is valid. The C memory will not
+// be deallocated when the go object is finalized by GC. This applies to all
+// other "FromC" functions.
+func cedrusFromC(ptr cCedrus) Cedrus {
 	return &CedrusObj{inner: ptr}
 }
 
@@ -55,12 +54,11 @@ func (c Cedrus) Free() {
 
 //// begin CedrusValueRef def
 
-// CCedrusValueRef is the C pointer type for a CedrusValueRef object.
-type CCedrusValueRef = *C.CedrusValueRef
+type cCedrusValueRef = *C.CedrusValueRef
 
 // CedrusValueRefObj is the wrapped CedrusValueRef pointer.
 type CedrusValueRefObj struct {
-	inner CCedrusValueRef
+	inner cCedrusValueRef
 	freed bool
 }
 
@@ -68,12 +66,7 @@ type CedrusValueRefObj struct {
 // reader lock).
 type CedrusValueRef = *CedrusValueRefObj
 
-// CedrusValueRefFromC converts an existing C pointer into a go object. Notice that
-// when the go object does *not* own the resource of the C pointer, so it is
-// only valid to the extent in which the given C pointer is valid. The C memory
-// will not be deallocated when the go object is finalized by GC. This applies
-// to all other "FromC" functions.
-func CedrusValueRefFromC(ptr CCedrusValueRef) CedrusValueRef {
+func cedrusValueRefFromC(ptr cCedrusValueRef) CedrusValueRef {
 	return &CedrusValueRefObj{inner: ptr}
 }
 
@@ -89,12 +82,11 @@ func (vr CedrusValueRef) Free() {
 
 //// begin CedrusValueMut def
 
-// CCedrusValueMut is the C pointer type for a CedrusValueMut object.
-type CCedrusValueMut = *C.CedrusValueMut
+type cCedrusValueMut = *C.CedrusValueMut
 
 // CedrusValueMutObj is the wrapped CedrusValueMut pointer.
 type CedrusValueMutObj struct {
-	inner CCedrusValueMut
+	inner cCedrusValueMut
 	freed bool
 }
 
@@ -102,12 +94,7 @@ type CedrusValueMutObj struct {
 // writer lock).
 type CedrusValueMut = *CedrusValueMutObj
 
-// CedrusValueMutFromC converts an existing C pointer into a go object. Notice that
-// when the go object does *not* own the resource of the C pointer, so it is
-// only valid to the extent in which the given C pointer is valid. The C memory
-// will not be deallocated when the go object is finalized by GC. This applies
-// to all other "FromC" functions.
-func CedrusValueMutFromC(ptr CCedrusValueMut) CedrusValueMut {
+func cedrusValueMutFromC(ptr cCedrusValueMut) CedrusValueMut {
 	return &CedrusValueMutObj{inner: ptr}
 }
 
@@ -123,25 +110,31 @@ func (vm CedrusValueMut) Free() {
 
 //// begin CedrusWriteBatch def
 
-// CCedrusWriteBatch is the C pointer type for a CedrusWriteBatch object.
-type CCedrusWriteBatch = *C.CedrusWriteBatch
+type cCedrusWriteBatch = *C.CedrusWriteBatch
 
 // CedrusWriteBatchObj is the wrapped CedrusWriteBatch pointer.
 type CedrusWriteBatchObj struct {
-	inner CCedrusWriteBatch
+	inner cCedrusWriteBatch
 	freed bool
 }
 
 // CedrusWriteBatch keeps a write batch.
 type CedrusWriteBatch = *CedrusWriteBatchObj
 
-// CedrusWriteBatchFromC converts an existing C pointer into a go object. Notice that
-// when the go object does *not* own the resource of the C pointer, so it is
-// only valid to the extent in which the given C pointer is valid. The C memory
-// will not be deallocated when the go object is finalized by GC. This applies
-// to all other "FromC" functions.
-func CedrusWriteBatchFromC(ptr CCedrusWriteBatch) CedrusWriteBatch {
+func cedrusWriteBatchFromC(ptr cCedrusWriteBatch) CedrusWriteBatch {
 	return &CedrusWriteBatchObj{inner: ptr}
+}
+
+// Drop aborts the current write batch. Do not call this function after a
+// `Write` or an error from a write batch operation (`Put`, etc.) as the write
+// batch is automatically freed in either case. Only call this function when
+// the write batch has not had any error and you just would like to manually
+// abort it.
+func (wb CedrusWriteBatch) Drop() {
+	if doubleFreeWarn(&wb.freed) {
+		return
+	}
+	C.cedrus_writebatch_drop(wb.inner)
 }
 
 //// end CedrusWriteBatch def
@@ -157,7 +150,7 @@ func NewCedrus(dbPath string, config *CedrusConfig, truncate bool) (res Cedrus) 
 	if truncate {
 		trunc = 1
 	}
-	res = CedrusFromC(C.cedrus_new(dbPathStr, config, trunc))
+	res = cedrusFromC(C.cedrus_new(dbPathStr, config, trunc))
 	C.free(rawPtr(dbPathStr))
 	return
 }
@@ -197,9 +190,11 @@ func (c Cedrus) Put(key []byte, val []byte) int {
 // should be freed by `Free` after use.
 func (c Cedrus) Get(key []byte) (res int, vr CedrusValueRef) {
 	var vrc *C.CedrusValueRef
-	res = int(C.cedrus_get(c.inner, (*C.uint8_t)(&key[0]), (C.size_t)(len(key)), &vrc))
+	res = int(C.cedrus_get(
+		c.inner,
+		(*C.uint8_t)(&key[0]), (C.size_t)(len(key)), &vrc))
 	if res == 0 {
-		vr = CedrusValueRefFromC(vrc)
+		vr = cedrusValueRefFromC(vrc)
 	}
 	return
 }
@@ -210,9 +205,11 @@ func (c Cedrus) Get(key []byte) (res int, vr CedrusValueRef) {
 // which should be freed by `Free` after use.
 func (c Cedrus) GetMut(key []byte) (res int, vm CedrusValueMut) {
 	var vmc *C.CedrusValueMut
-	res = int(C.cedrus_get_mut(c.inner, (*C.uint8_t)(&key[0]), (C.size_t)(len(key)), &vmc))
+	res = int(C.cedrus_get_mut(
+		c.inner,
+		(*C.uint8_t)(&key[0]), (C.size_t)(len(key)), &vmc))
 	if res == 0 {
-		vm = CedrusValueMutFromC(vmc)
+		vm = cedrusValueMutFromC(vmc)
 	}
 	return
 }
@@ -265,7 +262,7 @@ func (c Cedrus) GetByHash(key []byte) (res int, vr CedrusValueRef) {
 	var vrc *C.CedrusValueRef
 	res = int(C.cedrus_get_by_hash(c.inner, (*C.uint8_t)(&key[0]), &vrc))
 	if res == 0 {
-		vr = CedrusValueRefFromC(vrc)
+		vr = cedrusValueRefFromC(vrc)
 	}
 	return
 }
@@ -283,7 +280,7 @@ func (c Cedrus) GetByHashMut(key []byte) (res int, vm CedrusValueMut) {
 	var vmc *C.CedrusValueMut
 	res = int(C.cedrus_get_by_hash_mut(c.inner, (*C.uint8_t)(&key[0]), &vmc))
 	if res == 0 {
-		vm = CedrusValueMutFromC(vmc)
+		vm = cedrusValueMutFromC(vmc)
 	}
 	return
 }
@@ -314,9 +311,8 @@ func (c Cedrus) DeleteByHash(key []byte) int {
 // - A thread must drop (either by `Write`, or due to error in operations) the
 // previous write batch before it creates the subsequent one.  Creating two
 // write batches at once will result in a deadlock.
-func (c Cedrus) NewWriteBatch() (res CedrusWriteBatch) {
-	res = CedrusWriteBatchFromC(C.cedrus_writebatch_new(c.inner))
-	return
+func (c Cedrus) NewWriteBatch() CedrusWriteBatch {
+	return cedrusWriteBatchFromC(C.cedrus_writebatch_new(c.inner))
 }
 
 // Put pushes a `Put` operation to the write batch.
@@ -356,7 +352,7 @@ func (wb CedrusWriteBatch) PutByHash(key []byte, val []byte) int {
 // - Returns 0 on success. When it returns non-zero value, the write batch is
 // automatically aborted and freed. The write batch pointer will become invalid
 // and one should not use it with any other functions.
-func (wb CedrusWriteBatch) DeleteByHash(key []byte, val []byte) int {
+func (wb CedrusWriteBatch) DeleteByHash(key []byte) int {
 	return int(C.cedrus_writebatch_delete_by_hash(
 		wb.inner,
 		(*C.uint8_t)(&key[0])))
@@ -366,18 +362,6 @@ func (wb CedrusWriteBatch) DeleteByHash(key []byte, val []byte) int {
 // - Returns 0 on success. The write batch is always guaranteed to be freed.
 func (wb CedrusWriteBatch) Write() int {
 	return int(C.cedrus_writebatch_write(wb.inner))
-}
-
-// Drop aborts the current write batch. Do not call this function after a
-// `Write` or an error from a write batch operation (`Put`, etc.) as the write
-// batch is automatically freed in either case. Only call this function when
-// the write batch has not had any error and you just would like to manually
-// abort it.
-func (wb CedrusWriteBatch) Drop() {
-	if doubleFreeWarn(&wb.freed) {
-		return
-	}
-	C.cedrus_writebatch_drop(wb.inner)
 }
 
 // CheckIntegrity checks the integrity of the database. Note that this method
