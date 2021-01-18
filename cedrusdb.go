@@ -22,13 +22,16 @@ func doubleFreeWarn(freed *bool) (res bool) {
 
 //// begin Cedrus def
 
-// CCedrus is the C pointer type for a NetAddr object
+// CCedrus is the C pointer type for a Cedrus object.
 type CCedrus = *C.Cedrus
+
+// CedrusObj is the wrapped Cedrus pointer.
 type CedrusObj struct {
 	inner CCedrus
 	freed bool
 }
 
+// Cedrus is the CedrusDB handle.
 type Cedrus = *CedrusObj
 
 // CedrusFromC converts an existing C pointer into a go object. Notice that
@@ -40,7 +43,7 @@ func CedrusFromC(ptr CCedrus) Cedrus {
 	return &CedrusObj{inner: ptr}
 }
 
-// Free the underlying C pointer manually.
+// Free closes the CedrusDB and free the underlying C pointer.
 func (c Cedrus) Free() {
 	if doubleFreeWarn(&c.freed) {
 		return
@@ -52,17 +55,17 @@ func (c Cedrus) Free() {
 
 //// begin CedrusValueRef def
 
-// CCedrusValueRef is the C pointer type for a NetAddr object
+// CCedrusValueRef is the C pointer type for a CedrusValueRef object.
 type CCedrusValueRef = *C.CedrusValueRef
 
-// CedrusValueRefObj is a actual struct.
+// CedrusValueRefObj is the wrapped CedrusValueRef pointer.
 type CedrusValueRefObj struct {
 	inner CCedrusValueRef
 	freed bool
 }
 
-// CedrusValueRef is an accessible handle to the item's value in the store
-// (with a held reader lock).
+// CedrusValueRef is a handle to the item's value in the store (by holding a
+// reader lock).
 type CedrusValueRef = *CedrusValueRefObj
 
 // CedrusValueRefFromC converts an existing C pointer into a go object. Notice that
@@ -86,13 +89,17 @@ func (vr CedrusValueRef) Free() {
 
 //// begin CedrusValueMut def
 
-// CCedrusValueMut is the C pointer type for a NetAddr object
+// CCedrusValueMut is the C pointer type for a CedrusValueMut object.
 type CCedrusValueMut = *C.CedrusValueMut
+
+// CedrusValueMutObj is the wrapped CedrusValueMut pointer.
 type CedrusValueMutObj struct {
 	inner CCedrusValueMut
 	freed bool
 }
 
+// CedrusValueMut is a handle to the item's value in the store (by holding a
+// writer lock).
 type CedrusValueMut = *CedrusValueMutObj
 
 // CedrusValueMutFromC converts an existing C pointer into a go object. Notice that
@@ -116,14 +123,16 @@ func (vm CedrusValueMut) Free() {
 
 //// begin CedrusWriteBatch def
 
-// CCedrusWriteBatch is the C pointer type for a CedrusWriteBatch object
+// CCedrusWriteBatch is the C pointer type for a CedrusWriteBatch object.
 type CCedrusWriteBatch = *C.CedrusWriteBatch
+
+// CedrusWriteBatchObj is the wrapped CedrusWriteBatch pointer.
 type CedrusWriteBatchObj struct {
 	inner CCedrusWriteBatch
 	freed bool
 }
 
-// CedrusWriteBatch is a write batch.
+// CedrusWriteBatch keeps a write batch.
 type CedrusWriteBatch = *CedrusWriteBatchObj
 
 // CedrusWriteBatchFromC converts an existing C pointer into a go object. Notice that
@@ -137,11 +146,12 @@ func CedrusWriteBatchFromC(ptr CCedrusWriteBatch) CedrusWriteBatch {
 
 //// end CedrusWriteBatch def
 
+// CedrusConfig is the configuration for creating/opening CedrusDB.
 type CedrusConfig = C.CedrusConfig
 
 // NewCedrus creates a CedrusDB handle. You should manually free the handle to
-// close the DB after use by `Free()`.
-func NewCedrus(dbPath string, config *C.CedrusConfig, truncate bool) (res Cedrus) {
+// close the DB after use by `Free`.
+func NewCedrus(dbPath string, config *CedrusConfig, truncate bool) (res Cedrus) {
 	dbPathStr := C.CString(dbPath)
 	var trunc C.int
 	if truncate {
@@ -152,18 +162,20 @@ func NewCedrus(dbPath string, config *C.CedrusConfig, truncate bool) (res Cedrus
 	return
 }
 
-// DefaultConfig generates a default config for CedrusDB
+// DefaultConfig generates a default config for CedrusDB.
 func DefaultConfig() CedrusConfig {
 	return C.cedrus_config_default()
 }
 
-// AsBytes access the byte content of the value. One should *not* change write the byte slice.
+// AsBytes access the byte content of the value. One should *not* write to the
+// byte slice.
 func (vr CedrusValueRef) AsBytes() (bytes []byte) {
 	vif := C.cedrus_vr_info(vr.inner)
 	return C.GoBytes(rawPtr(vif.base), C.int(vif.size))
 }
 
-// AsBytes access the byte content of the value. One should *not* change write the byte slice.
+// AsBytes access the byte content of the value. One should *not* write to the
+// byte slice.
 func (vm CedrusValueMut) AsBytes() (bytes []byte) {
 	vif := C.cedrus_vm_info(vm.inner)
 	return C.GoBytes(rawPtr(vif.base), C.int(vif.size))
@@ -182,7 +194,7 @@ func (c Cedrus) Put(key []byte, val []byte) int {
 // Get (aka. lookup/query) an item from the store with an arbitrary key.
 // - Returns 0 on success, -1 on failure. TODO: more detailed error code.
 // - `vr` is assigned to a struct that could be used to read the value, which
-// should be freed by `cedrus_vr_free` after use.
+// should be freed by `Free` after use.
 func (c Cedrus) Get(key []byte) (res int, vr CedrusValueRef) {
 	var vrc *C.CedrusValueRef
 	res = int(C.cedrus_get(c.inner, (*C.uint8_t)(&key[0]), (C.size_t)(len(key)), &vrc))
@@ -195,8 +207,7 @@ func (c Cedrus) Get(key []byte) (res int, vr CedrusValueRef) {
 // GetMut gets (aka. lookup/query) an item from the store with an arbitrary key.
 // - Returns 0 on success, -1 on failure. TODO: more detailed error code.
 // - `vm` is assigned to a struct that could be used to read/write the value,
-// which should be freed by `cedrus_vm_free` after use. To update the value,
-// use it in `modify` function.
+// which should be freed by `Free` after use.
 func (c Cedrus) GetMut(key []byte) (res int, vm CedrusValueMut) {
 	var vmc *C.CedrusValueMut
 	res = int(C.cedrus_get_mut(c.inner, (*C.uint8_t)(&key[0]), (C.size_t)(len(key)), &vmc))
@@ -214,9 +225,10 @@ func (c Cedrus) Delete(key []byte) int {
 		(*C.uint8_t)(&key[0]), (C.size_t)(len(key))))
 }
 
-// Update (aka. update) the value by the given `ValueMut`. Unlike
-// `cedrus_modify`, this function simply replace the value data by copying.
-// - Returns 0 on success, -1 on failure. TODO: more detailed error code.
+// Update (aka. update) the value by the given `ValueMut`. This function simply
+// replaces the value data by copying.
+// - Returns 0 on success, -1 on failure.
+// TODO: more detailed error code.
 func (c Cedrus) Update(vm CedrusValueMut, newValue []byte) int {
 	return int(C.cedrus_update(
 		c.inner,
@@ -243,8 +255,8 @@ func (c Cedrus) PutByHash(key []byte, val []byte) int {
 // GetByHash gets (aka. lookup/query) an item from the store, assuming the key
 // is already a hash value.
 // - Returns 0 on success, -1 on failure. TODO: more detailed error code.
-// - `vr` is assigned to an opaque pointer that points to ValueRef, which
-// should be freed by `cedrus_vr_free` after use.
+// - `vr` is assigned to a struct that could be used to read the value, which
+// should be freed by `Free` after use.
 //
 // Note: By assuming the key is already a hash value, CedrusDB will no longer
 // hash the key. The length is by default 32 bytes, but could be 8/16 bytes if
@@ -262,8 +274,7 @@ func (c Cedrus) GetByHash(key []byte) (res int, vr CedrusValueRef) {
 // key is already a hash value.
 // - Returns 0 on success, -1 on failure. TODO: more detailed error code.
 // - `vm` is assigned to a struct that could be used to read/write the value,
-// which should be freed by `cedrus_vm_free` after use. To update the value,
-// use it in `modify` function.
+// which should be freed by `Free` after use.
 //
 // Note: By assuming the key is already a hash value, CedrusDB will no longer
 // hash the key. The length is by default 32 bytes, but could be 8/16 bytes if
@@ -277,6 +288,13 @@ func (c Cedrus) GetByHashMut(key []byte) (res int, vm CedrusValueMut) {
 	return
 }
 
+// DeleteByHash deletes (aka. remove) an item from the store, assuming the key
+// is already a hash value.  - Returns 0 on success, -1 on failure. TODO: more
+// detailed error code.
+//
+// Note: By assuming the key is already a hash value, CedrusDB will no longer
+// hash the key. The length is by default 32 bytes, but could be 8/16 bytes if
+// Rust code is built with `hash64`/`hash128`.
 func (c Cedrus) DeleteByHash(key []byte) int {
 	return int(C.cedrus_delete_by_hash(
 		c.inner,
@@ -289,11 +307,11 @@ func (c Cedrus) DeleteByHash(key []byte) int {
 // Performance tips:
 // - Some locks are grabbed once a new write batch is created. Thus, it is
 // always a good practice to prepare the batched writes before creating the
-// write batch, and then feed all of them in at once, followed by `write`.
+// write batch, and then feed all of them in at once, followed by `Write`.
 // - For a single write operation, directly using functions under
-// `CedrusWithHasher::` is more efficient than creating an unnecessary write
+// `Cedrus` is more efficient than creating an unnecessary write
 // batch. A write batch keeps its guarantees at some overhead.
-// - A thread must drop (either by `write`, or due to error in operations) the
+// - A thread must drop (either by `Write`, or due to error in operations) the
 // previous write batch before it creates the subsequent one.  Creating two
 // write batches at once will result in a deadlock.
 func (c Cedrus) NewWriteBatch() (res CedrusWriteBatch) {
@@ -301,7 +319,7 @@ func (c Cedrus) NewWriteBatch() (res CedrusWriteBatch) {
 	return
 }
 
-// Put pushes a `put` operation to the write batch.
+// Put pushes a `Put` operation to the write batch.
 // - Returns 0 on success.
 // When it returns non-zero value, the write batch is automatically aborted and
 // freed. The write batch pointer will become invalid and one should not use it
@@ -313,7 +331,7 @@ func (wb CedrusWriteBatch) Put(key []byte, val []byte) int {
 		(*C.uint8_t)(&val[0]), (C.size_t)(len(val))))
 }
 
-// Delete pushes a `delete` operation to the write batch.
+// Delete pushes a `Delete` operation to the write batch.
 // - Returns 0 on success. When it returns non-zero value, the write batch is
 // automatically aborted and freed. The write batch pointer will become invalid
 // and one should not use it with any other functions.
@@ -323,7 +341,7 @@ func (wb CedrusWriteBatch) Delete(key []byte) int {
 		(*C.uint8_t)(&key[0]), (C.size_t)(len(key))))
 }
 
-// PutByHash pushes a `put_by_hash` operation to the write batch.
+// PutByHash pushes a `PutByHash` operation to the write batch.
 // - Returns 0 on success. When it returns non-zero value, the write batch is
 // automatically aborted and freed. The write batch pointer will become invalid
 // and one should not use it with any other functions.
@@ -334,7 +352,7 @@ func (wb CedrusWriteBatch) PutByHash(key []byte, val []byte) int {
 		(*C.uint8_t)(&val[0]), (C.size_t)(len(val))))
 }
 
-// DeleteByHash pushes a `delete_by_hash` operation to the write batch.
+// DeleteByHash pushes a `DeleteByHash` operation to the write batch.
 // - Returns 0 on success. When it returns non-zero value, the write batch is
 // automatically aborted and freed. The write batch pointer will become invalid
 // and one should not use it with any other functions.
