@@ -51,6 +51,12 @@ func main() {
 	assertOk(db.Update(vm, []byte("worl*")))
 	vm.Free()
 
+	ret, vm = db.GetByHashMut([]byte(hashKey))
+	assertOk(ret)
+	fmt.Printf("%s\n", string(vm.AsBytes()))
+	assertOk(db.Update(vm, []byte("....")))
+	vm.Free()
+
 	ret, vr = db.Get([]byte("hello"))
 	assertOk(ret)
 	fmt.Printf("%s\n", string(vr.AsBytes()))
