@@ -222,12 +222,13 @@ func (c Cedrus) Delete(key []byte) int {
 		(*C.uint8_t)(&key[0]), (C.size_t)(len(key))))
 }
 
-// Update (aka. update) the value by the given `ValueMut`. This function simply
-// replaces the value data by copying.
-// - Returns 0 on success, -1 on failure.
-// TODO: more detailed error code.
-func (c Cedrus) Update(vm CedrusValueMut, newValue []byte) int {
-	return int(C.cedrus_update(
+// Replace (aka. update) the value at the given `ValueMut`. This function
+// simply replaces the value by copying and thus allows changing the value to
+// arbitrary size. The `ValueMut` handle will always be consumed and freed so
+// there is no need to call `Free`.
+// - Returns 0 on success, -1 on failure. TODO: more detailed error code.
+func (c Cedrus) Replace(vm CedrusValueMut, newValue []byte) int {
+	return int(C.cedrus_replace(
 		c.inner,
 		vm.inner,
 		(*C.uint8_t)(&newValue[0]),

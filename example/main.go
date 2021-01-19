@@ -48,14 +48,17 @@ func main() {
 	ret, vm := db.GetMut([]byte("hello"))
 	assertOk(ret)
 	fmt.Printf("%s\n", string(vm.AsBytes()))
-	assertOk(db.Update(vm, []byte("worl*")))
-	vm.Free()
+	assertOk(db.Replace(vm, []byte("worl*")))
 
 	ret, vm = db.GetByHashMut([]byte(hashKey))
 	assertOk(ret)
 	fmt.Printf("%s\n", string(vm.AsBytes()))
-	assertOk(db.Update(vm, []byte("....")))
-	vm.Free()
+	assertOk(db.Replace(vm, []byte("longer value")))
+
+	ret, vr = db.GetByHash([]byte([]byte(hashKey)))
+	assertOk(ret)
+	fmt.Printf("%s\n", string(vr.AsBytes()))
+	vr.Free()
 
 	ret, vr = db.Get([]byte("hello"))
 	assertOk(ret)
