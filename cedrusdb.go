@@ -20,6 +20,15 @@ func doubleFreeWarn(freed *bool) (res bool) {
 	return
 }
 
+var dummyBytes = []byte{0}
+
+func sliceAsBytes(s []byte) (*C.uint8_t, C.size_t) {
+	if len(s) == 0 {
+		return (*C.uint8_t)(&dummyBytes[0]), 0
+	}
+	return (*C.uint8_t)(&s[0]), (C.size_t)(len(s))
+}
+
 //// begin Cedrus def
 
 type cCedrus = *C.Cedrus
@@ -178,10 +187,9 @@ func (vm CedrusValueMut) AsBytes() (bytes []byte) {
 // Returns -1 on failure, 0 if item is inserted, 1 if an existing item is
 // updated. TODO: more detailed error code.
 func (c Cedrus) Put(key []byte, val []byte) int {
-	return int(C.cedrus_put(
-		c.inner,
-		(*C.uint8_t)(&key[0]), (C.size_t)(len(key)),
-		(*C.uint8_t)(&val[0]), (C.size_t)(len(val))))
+	kPtr, kLen := sliceAsBytes(key)
+	vPtr, vLen := sliceAsBytes(val)
+	return int(C.cedrus_put(c.inner, kPtr, kLen, vPtr, vLen))
 }
 
 // Get (aka. lookup/query) an item from the store with an arbitrary key.
@@ -190,9 +198,8 @@ func (c Cedrus) Put(key []byte, val []byte) int {
 // should be freed by `Free` after use.
 func (c Cedrus) Get(key []byte) (res int, vr CedrusValueRef) {
 	var vrc *C.CedrusValueRef
-	res = int(C.cedrus_get(
-		c.inner,
-		(*C.uint8_t)(&key[0]), (C.size_t)(len(key)), &vrc))
+	kPtr, kLen := sliceAsBytes(key)
+	res = int(C.cedrus_get(c.inner, kPtr, kLen, &vrc))
 	if res == 0 {
 		vr = cedrusValueRefFromC(vrc)
 	}
@@ -205,9 +212,8 @@ func (c Cedrus) Get(key []byte) (res int, vr CedrusValueRef) {
 // which should be freed by `Free` after use.
 func (c Cedrus) GetMut(key []byte) (res int, vm CedrusValueMut) {
 	var vmc *C.CedrusValueMut
-	res = int(C.cedrus_get_mut(
-		c.inner,
-		(*C.uint8_t)(&key[0]), (C.size_t)(len(key)), &vmc))
+	kPtr, kLen := sliceAsBytes(key)
+	res = int(C.cedrus_get_mut(c.inner, kPtr, kLen, &vmc))
 	if res == 0 {
 		vm = cedrusValueMutFromC(vmc)
 	}
@@ -217,9 +223,8 @@ func (c Cedrus) GetMut(key []byte) (res int, vm CedrusValueMut) {
 // Delete (aka. remove) an item from the store with an arbitrary key.
 // - Returns 0 on success, -1 on failure. TODO: more detailed error code.
 func (c Cedrus) Delete(key []byte) int {
-	return int(C.cedrus_delete(
-		c.inner,
-		(*C.uint8_t)(&key[0]), (C.size_t)(len(key))))
+	kPtr, kLen := sliceAsBytes(key)
+	return int(C.cedrus_delete(c.inner, kPtr, kLen))
 }
 
 // Replace (aka. update) the value at the given `ValueMut`. This function
@@ -228,11 +233,8 @@ func (c Cedrus) Delete(key []byte) int {
 // there is no need to call `Free`.
 // - Returns 0 on success, -1 on failure. TODO: more detailed error code.
 func (c Cedrus) Replace(vm CedrusValueMut, newValue []byte) int {
-	return int(C.cedrus_replace(
-		c.inner,
-		vm.inner,
-		(*C.uint8_t)(&newValue[0]),
-		(C.size_t)(len(newValue))))
+	vPtr, vLen := sliceAsBytes(newValue)
+	return int(C.cedrus_replace(c.inner, vm.inner, vPtr, vLen))
 }
 
 // PutByHash puts (aka. insert/upsert) an item into the store, assuming the key
@@ -244,10 +246,9 @@ func (c Cedrus) Replace(vm CedrusValueMut, newValue []byte) int {
 // hash the key. The length is by default 32 bytes, but could be 8/16 bytes if
 // Rust code is built with `hash64`/`hash128`.
 func (c Cedrus) PutByHash(key []byte, val []byte) int {
-	return int(C.cedrus_put_by_hash(
-		c.inner,
-		(*C.uint8_t)(&key[0]),
-		(*C.uint8_t)(&val[0]), (C.size_t)(len(val))))
+	kPtr, _ := sliceAsBytes(key)
+	vPtr, vLen := sliceAsBytes(val)
+	return int(C.cedrus_put_by_hash(c.inner, kPtr, vPtr, vLen))
 }
 
 // GetByHash gets (aka. lookup/query) an item from the store, assuming the key
@@ -261,7 +262,8 @@ func (c Cedrus) PutByHash(key []byte, val []byte) int {
 // Rust code is built with `hash64`/`hash128`.
 func (c Cedrus) GetByHash(key []byte) (res int, vr CedrusValueRef) {
 	var vrc *C.CedrusValueRef
-	res = int(C.cedrus_get_by_hash(c.inner, (*C.uint8_t)(&key[0]), &vrc))
+	kPtr, _ := sliceAsBytes(key)
+	res = int(C.cedrus_get_by_hash(c.inner, kPtr, &vrc))
 	if res == 0 {
 		vr = cedrusValueRefFromC(vrc)
 	}
@@ -279,7 +281,8 @@ func (c Cedrus) GetByHash(key []byte) (res int, vr CedrusValueRef) {
 // Rust code is built with `hash64`/`hash128`.
 func (c Cedrus) GetByHashMut(key []byte) (res int, vm CedrusValueMut) {
 	var vmc *C.CedrusValueMut
-	res = int(C.cedrus_get_by_hash_mut(c.inner, (*C.uint8_t)(&key[0]), &vmc))
+	kPtr, _ := sliceAsBytes(key)
+	res = int(C.cedrus_get_by_hash_mut(c.inner, kPtr, &vmc))
 	if res == 0 {
 		vm = cedrusValueMutFromC(vmc)
 	}
@@ -294,9 +297,8 @@ func (c Cedrus) GetByHashMut(key []byte) (res int, vm CedrusValueMut) {
 // hash the key. The length is by default 32 bytes, but could be 8/16 bytes if
 // Rust code is built with `hash64`/`hash128`.
 func (c Cedrus) DeleteByHash(key []byte) int {
-	return int(C.cedrus_delete_by_hash(
-		c.inner,
-		(*C.uint8_t)(&key[0])))
+	kPtr, _ := sliceAsBytes(key)
+	return int(C.cedrus_delete_by_hash(c.inner, kPtr))
 }
 
 // NewWriteBatch creates a write batch. A write batch allows batching more than
@@ -322,10 +324,9 @@ func (c Cedrus) NewWriteBatch() CedrusWriteBatch {
 // freed. The write batch pointer will become invalid and one should not use it
 // with any other functions.
 func (wb CedrusWriteBatch) Put(key []byte, val []byte) int {
-	return int(C.cedrus_writebatch_put(
-		wb.inner,
-		(*C.uint8_t)(&key[0]), (C.size_t)(len(key)),
-		(*C.uint8_t)(&val[0]), (C.size_t)(len(val))))
+	kPtr, kLen := sliceAsBytes(key)
+	vPtr, vLen := sliceAsBytes(val)
+	return int(C.cedrus_writebatch_put(wb.inner, kPtr, kLen, vPtr, vLen))
 }
 
 // Delete pushes a `Delete` operation to the write batch.
@@ -333,9 +334,8 @@ func (wb CedrusWriteBatch) Put(key []byte, val []byte) int {
 // automatically aborted and freed. The write batch pointer will become invalid
 // and one should not use it with any other functions.
 func (wb CedrusWriteBatch) Delete(key []byte) int {
-	return int(C.cedrus_writebatch_delete(
-		wb.inner,
-		(*C.uint8_t)(&key[0]), (C.size_t)(len(key))))
+	kPtr, kLen := sliceAsBytes(key)
+	return int(C.cedrus_writebatch_delete(wb.inner, kPtr, kLen))
 }
 
 // PutByHash pushes a `PutByHash` operation to the write batch.
@@ -343,10 +343,9 @@ func (wb CedrusWriteBatch) Delete(key []byte) int {
 // automatically aborted and freed. The write batch pointer will become invalid
 // and one should not use it with any other functions.
 func (wb CedrusWriteBatch) PutByHash(key []byte, val []byte) int {
-	return int(C.cedrus_writebatch_put_by_hash(
-		wb.inner,
-		(*C.uint8_t)(&key[0]),
-		(*C.uint8_t)(&val[0]), (C.size_t)(len(val))))
+	kPtr, _ := sliceAsBytes(key)
+	vPtr, vLen := sliceAsBytes(val)
+	return int(C.cedrus_writebatch_put_by_hash(wb.inner, kPtr, vPtr, vLen))
 }
 
 // DeleteByHash pushes a `DeleteByHash` operation to the write batch.
@@ -354,9 +353,8 @@ func (wb CedrusWriteBatch) PutByHash(key []byte, val []byte) int {
 // automatically aborted and freed. The write batch pointer will become invalid
 // and one should not use it with any other functions.
 func (wb CedrusWriteBatch) DeleteByHash(key []byte) int {
-	return int(C.cedrus_writebatch_delete_by_hash(
-		wb.inner,
-		(*C.uint8_t)(&key[0])))
+	kPtr, _ := sliceAsBytes(key)
+	return int(C.cedrus_writebatch_delete_by_hash(wb.inner, kPtr))
 }
 
 // Finalize and commit all operations in the write batch.

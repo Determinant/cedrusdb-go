@@ -1,8 +1,8 @@
 export GOPATH="$(go env GOPATH)"
 export CEDRUSDB_ORG="Determinant"
-export CEDRUSDB_GO_VER="v0.1.0"
+export CEDRUSDB_GO_VER="v0.1.1"
 export CEDRUSDB_GO_PATH="$GOPATH/src/github.com/$CEDRUSDB_ORG/cedrusdb-go"
-export CEDRUSDB_BIN_REV="v0.3.2"
+export CEDRUSDB_BIN_REV="v0.3.3"
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     export CEDRUSDB_PATH="$CEDRUSDB_GO_PATH/build"
