@@ -1,6 +1,6 @@
 export GOPATH="$(go env GOPATH)"
 export CEDRUSDB_ORG="Determinant"
-export CEDRUSDB_GO_VER="v0.1.2"
+export CEDRUSDB_GO_VER="v0.1.3"
 export CEDRUSDB_GO_PATH="$GOPATH/src/github.com/$CEDRUSDB_ORG/cedrusdb-go"
 export CEDRUSDB_BIN_REV="v0.3.4"
 
