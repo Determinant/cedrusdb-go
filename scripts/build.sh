@@ -10,10 +10,6 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
         echo "Architecture not supported yet."
         exit 1
     fi
-    if [[ ! "$SRC_DIR/../" -ef "$CEDRUSDB_GO_PATH" ]]; then
-        echo "The script is not in the go path repo ($SRC_DIR != $CEDRUSDB_GO_PATH)"
-        exit 1
-    fi
     mkdir -p "$CEDRUSDB_PATH"
     cd "$CEDRUSDB_PATH"
     if [[ ! -f ./lib/libcedrusdb.a ]]; then

@@ -2,14 +2,10 @@
 
 all: cdep examples
 
-examples: build/example
+examples: example-app
 
-cdep: build/libcedrusdb.a
-
-build/libcedrusdb.a:
+example-app: example/main.go
 	scripts/build.sh
-
-build/example: build/libcedrusdb.a example/main.go
 	bash -c 'source $$(go env GOPATH)/src/github.com/Determinant/cedrusdb-go/scripts/env.sh && go build -o $@ github.com/Determinant/cedrusdb-go/example'
 
 clean:
